@@ -1,5 +1,6 @@
 package com.example.fcm;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -15,10 +16,12 @@ import com.google.android.gms.tasks.Task;
 import com.google.firebase.iid.FirebaseInstanceId;
 import com.google.firebase.iid.InstanceIdResult;
 import com.google.firebase.messaging.FirebaseMessaging;
+import com.google.firebase.messaging.RemoteMessage;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.spongycastle.asn1.nist.NISTNamedCurves;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,7 +33,7 @@ import java.util.Scanner;
 import static com.example.fcm.R.id.txt;
 
 public class MainActivity extends AppCompatActivity {
-	private static final String AUTH_KEY = "key=YOUR-SERVER-KEY";
+	private static final String AUTH_KEY = "AAAAjGipi60:APA91bExp6Dw6I33EZ-noe8UgeL3I06m2dLyINsIS6C835DSfzS6R8dJroE0cL31JEyDeHncYsHI-tRkWykB0Ji7aZimiRfhxmj_J9jb8cGBQiiyCgiKDACfc750Ffzrz_tMlEzP6ife";
 	private TextView mTextView;
 	private String token;
 
@@ -39,6 +42,9 @@ public class MainActivity extends AppCompatActivity {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
 		mTextView = findViewById(txt);
+
+		ProtocolClass.curve = NISTNamedCurves.getByName("P-256").getCurve();
+		ProtocolClass.k = ProtocolClass.genK();
 
 		Bundle bundle = getIntent().getExtras();
 		if (bundle != null) {
@@ -58,6 +64,7 @@ public class MainActivity extends AppCompatActivity {
 					Log.w("FCM TOKEN Failed", task.getException());
 				} else {
 					token = task.getResult().getToken();
+					ProtocolClass.deviceToken = token;
 					Log.i("FCM TOKEN", token);
 				}
 			}
@@ -159,6 +166,22 @@ public class MainActivity extends AppCompatActivity {
 		} catch (JSONException | IOException e) {
 			e.printStackTrace();
 		}
+	}
+
+	// Writen By ZhangSummary referring to https://firebase.google.com/docs/cloud-messaging/android/upstream. Send message. XMPP seems wrong...
+	public void sendUpstream() {
+		final String SENDER_ID = getResources().getString(R.string.gcm_defaultSenderId);
+		final int messageID = 0;
+
+		// [START fcm_send_upstream]
+		FirebaseMessaging fm = FirebaseMessaging.getInstance();
+		fm.send(new RemoteMessage.Builder(SENDER_ID + "@fcm.googleapis.com")
+				.setMessageId(Integer.toString(messageID))
+				.addData("my_message", "Hello World")
+				.addData("my_action", "SAY_HELLO")
+				.build());
+
+		// [END fcm_send_upstream]
 	}
 
 	private String convertStreamToString(InputStream is) {
