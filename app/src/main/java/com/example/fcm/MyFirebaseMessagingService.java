@@ -31,13 +31,13 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Map;
+import java.util.Objects;
 import java.util.PriorityQueue;
 import java.util.Scanner;
 
 public class MyFirebaseMessagingService extends FirebaseMessagingService {
 	private static final String TAG = "FMS";
 	public static final String FCM_PARAM = "picture";
-	private static final String AUTH_KEY = "AAAAjGipi60:APA91bExp6Dw6I33EZ-noe8UgeL3I06m2dLyINsIS6C835DSfzS6R8dJroE0cL31JEyDeHncYsHI-tRkWykB0Ji7aZimiRfhxmj_J9jb8cGBQiiyCgiKDACfc750Ffzrz_tMlEzP6ife";
 	private static final String CHANNEL_NAME = "FCM";
 	private static final String CHANNEL_DESC = "Firebase Cloud Messaging";
 	private int numMessages = 0;
@@ -64,6 +64,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
             boolean handled = false;
             assert type != null;
+            // 应该没啥用，理论上不可能收到token类别的消息。
             if (type.equals("token")) {
                 String token = msg.get("token");
                 Log.d(TAG, "Message Data Recv Token: "+token);
@@ -71,19 +72,68 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 handled = true;
             }
             if (type.equals("ecpoint")) {
-            	String x = msg.get("x");
-            	String y = msg.get("y");
-            	String description = msg.get("description");
+				JSONObject data = null;
+				String x = null;
+				String y = null;
+				String description = null;
+				try {
+					data = new JSONObject(Objects.requireNonNull(msg.get("data")));
+					x = (String) data.get("x");
+					y = (String) data.get("y");
+					description = (String) data.get("description");
+				} catch (JSONException e) {
+					e.printStackTrace();
+				}
+				assert x != null;
+				assert y != null;
+				assert description != null;
 				Log.d(TAG, "Message Data Recv ECPoint: x:"+x+" y: "+y+" desp: "+description);
 				if (description.equals("alpha")) {
 					ProtocolClass.alpha = ProtocolClass.retrivePoint(x, y);
 					assert ProtocolClass.alpha != null;
-					ProtocolClass.beta = ProtocolClass.computeBeta(ProtocolClass.alpha, ProtocolClass.k);
-					sendMsgToClient("ecpoint", x, y, "beta");
+					Log.d("DEBUG", "k: "+ProtocolClass.k.toString());
+					ProtocolClass.beta = ProtocolClass.computeBeta(ProtocolClass.alpha, ProtocolClass.k).normalize();
+					Log.d("DEBUG", "beta_x: "+ProtocolClass.beta.getAffineXCoord().toString());
+					new Thread(new Runnable() {
+						@Override
+						public void run() {
+							JSONObject jECPointPayload = new JSONObject();
+							try {
+								jECPointPayload.put("x", ProtocolClass.beta.getAffineXCoord().toString());
+								jECPointPayload.put("y", ProtocolClass.beta.getAffineYCoord().toString());
+								jECPointPayload.put("description", "beta");
+							} catch (JSONException e) {
+								e.printStackTrace();
+							}
+							Log.d("MSGTOCLIENT", "jECPointPayload"+jECPointPayload.toString());
+							ProtocolClass.sendMsgToClient("ecpoint", jECPointPayload);
+						}
+					}).start();
 				} else {
 					throw new RuntimeException("Unknown desp in ecpoint type");
 				}
 				handled = true;
+			}
+            if (type.equals("requestK")) {
+            	if (ProtocolClass.k == null) {
+            		ProtocolClass.k = ProtocolClass.genK();
+				}
+            	Log.d(TAG, ProtocolClass.k.toString(16));
+				new Thread(new Runnable() {
+					@Override
+					public void run() {
+						Log.d("DEBUG", "In Here");
+						JSONObject jKPayload = new JSONObject();
+						try {
+							jKPayload.put("k", ProtocolClass.k.toString(16));
+						} catch (JSONException e) {
+							e.printStackTrace();
+						}
+						Log.d("MSGTOCLIENT", "jKPayload"+jKPayload.toString());
+						ProtocolClass.sendMsgToClient("responseK", jKPayload);
+					}
+				}).start();
+            	handled = true;
 			}
 			if (!handled) {
 				Log.d(TAG, "Message Data Type Error");
@@ -156,56 +206,5 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
 		assert notificationManager != null;
 		notificationManager.notify(0, notificationBuilder.build());
-	}
-
-	private void sendMsgToClient(String type, String x, String y, String desp) {
-		assert ProtocolClass.clientToken != null;
-		JSONObject jPayload = new JSONObject();
-		JSONObject jData = new JSONObject();
-		try {
-			switch(type) {
-				case "tokens":
-					assert ProtocolClass.deviceToken != null;
-					jData.put("type", "token");
-					jData.put("token", ProtocolClass.deviceToken);
-					break;
-				case "ecpoint":
-					jData.put("type", "ecpoint");
-					jData.put("x", x);
-					jData.put("y", y);
-					jData.put("description", desp);
-					break;
-				default:
-					jData.put("type", "unknown");
-			}
-
-			jPayload.put("priority", "high");
-			jPayload.put("data", jData);
-			jPayload.put("to", ProtocolClass.clientToken);
-
-			URL url = new URL("https://fcm.googleapis.com/fcm/send");
-			HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-			conn.setRequestMethod("POST");
-			conn.setRequestProperty("Authorization", AUTH_KEY);
-			conn.setRequestProperty("Content-Type", "application/json");
-			conn.setDoOutput(true);
-
-			// Send FCM message content.
-			OutputStream outputStream = conn.getOutputStream();
-			outputStream.write(jPayload.toString().getBytes());
-
-			// Read FCM response.
-			InputStream inputStream = conn.getInputStream();
-			final String resp = convertStreamToString(inputStream);
-
-			Log.d(TAG, "send msg to client return value: "+resp);
-		} catch (JSONException | IOException e) {
-			e.printStackTrace();
-		}
-	}
-
-	private String convertStreamToString(InputStream is) {
-		Scanner s = new Scanner(is).useDelimiter("\\A");
-		return s.hasNext() ? s.next().replace(",", ",\n") : "";
 	}
 }
