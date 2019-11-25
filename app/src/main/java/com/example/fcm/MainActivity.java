@@ -41,7 +41,7 @@ import java.util.Scanner;
 import static com.example.fcm.R.id.txt;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
-	private static final String AUTH_KEY = "AAAAjGipi60:APA91bExp6Dw6I33EZ-noe8UgeL3I06m2dLyINsIS6C835DSfzS6R8dJroE0cL31JEyDeHncYsHI-tRkWykB0Ji7aZimiRfhxmj_J9jb8cGBQiiyCgiKDACfc750Ffzrz_tMlEzP6ife";
+	private static final String AUTH_KEY = "<yourservicekey>";
 	private TextView mTextView;
 	private String token;
 	private static final String DECODED_CONTENT_KEY = "codedContent";

@@ -32,7 +32,7 @@ public class ProtocolClass {
     public static ECPoint beta = null;
     public static BigInteger k = null;
 
-    private static final String AUTH_KEY = "key=AAAAjGipi60:APA91bExp6Dw6I33EZ-noe8UgeL3I06m2dLyINsIS6C835DSfzS6R8dJroE0cL31JEyDeHncYsHI-tRkWykB0Ji7aZimiRfhxmj_J9jb8cGBQiiyCgiKDACfc750Ffzrz_tMlEzP6ife";
+    private static final String AUTH_KEY = "key=<yourservicekey>";
 
 
     public static ECPoint retrivePoint(String x, String y) {
